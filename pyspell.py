@@ -1,32 +1,15 @@
 __author__ = 'Simone Mainardi, simonemainardi@startmail.com'
 
 import codecs
-
-
-class Word(object):
-    @staticmethod
-    def deletes(word, edit_distance):
-        """ Recursively create all the possible deletes at a distance * less than or equal to * `edit_distance`
-        from the `word` provided. For example, all the possible delete edits of the word `ciao`, at an
-        edit distance less than or equal to two are:
-        -> cia, cao, cio, iao (distance 1)
-        -> ci, ia, ca, ca, ao, co, ci, io, co, ia, ao, io (distance 2)
-
-        Duplicates are suppressed.
-        """
-        dels = set()
-        if len(word) <= 1 or edit_distance == 0:
-            return dels
-        for i in range(len(word)):
-            delete = word[:i] + word[i+1:]  # remove the i-th character from the word
-            dels.update([delete])
-            dels.update(Word.deletes(delete, edit_distance - 1))
-        return dels
+from word import Word
 
 
 class DictionaryItems(object):
     def __init__(self):
         self.items = {}  # it might be
+
+    def __getitem__(self, word):
+        return self.items[word] if word in self.items else {}
 
     def __setitem__(self, word, term):
         self.items.setdefault(word, {'term': term})  # only `term` by default
@@ -40,19 +23,32 @@ class DictionaryItems(object):
     def add_suggestion(self, delete, original, distance):
         self.__setitem__(delete, '')  # no term for deletes
         self.items[delete].setdefault('suggestions', {})
-        self.items[delete]['suggestions'][original] = distance
+        distances = self.items[delete]['suggestions'].values()  # it may be an empty list
+        if not distances or (distances and distance < min(distances)):  # keep only the minimum distance
+            self.items[delete]['suggestions'].clear()
+            self.items[delete]['suggestions'][original] = distance
 
 
 class Dictionary(object):
     def __init__(self, edit_distance_max=2):
         self.items = DictionaryItems()
+        self._words = set()
         self.edit_distance_max = edit_distance_max
 
     def add_word(self, word):
+        self._words.update([word])
         self.items[word] = word
         for delete in Word.deletes(word, self.edit_distance_max):
             distance = len(word) - len(delete)  # the distance of the current delete term from the original word
             self.items.add_suggestion(delete, word, distance)
+
+    def add_words(self, words):
+        for word in words:
+            self.add_word(word)
+
+    @property
+    def words(self):
+        return list(self._words)
 
     def initialize(self, dictionary_file):
         """ Initializes the dictionary using the `dictionary_file` provided, which is
@@ -62,6 +58,37 @@ class Dictionary(object):
             for line in f:
                 word = line.strip()
                 self.add_word(word)
+
+    def lookup(self, word):
+        results = set()
+        candidates = set([(word, 0)])  # a set of tuples (candidate, candidate_distance)
+        for delete in Word.deletes(word, self.edit_distance_max):
+            delete_distance = len(word) - len(delete)
+            candidates.update([(delete, delete_distance)])
+        candidates = sorted(candidates, key=lambda (x): -x[1])  # sort according to an increasing distance
+
+        while candidates:
+            candidate, candidate_distance = candidates.pop()  # the distance of the candidate from `word`
+            candidate_item = self.items[candidate]  # the (possibly empty) dictionary entry for candidate
+            if candidate_item:  # there is an entry for this item in the dictionary
+                if candidate_item['term'] != '':  # candidate is an original word!
+                    results.update([candidate_item['term']])
+                if 'suggestions' in candidate_item:
+                    for suggestion, suggestion_distance in candidate_item['suggestions'].items():
+                        if suggestion in results:
+                            continue  # early skip suggestions already found
+                        if suggestion == word:  # by chance, the suggestion is actually the word we are looking for
+                            real_distance = 0
+                        elif candidate_distance == 0:  # candidate _is_ the word we are looking up for
+                            real_distance = suggestion_distance
+                        else:  # candidate is a delete edit of the word we are looking up for
+                            real_distance = Word.damerau_levenshtein_distance(candidate, suggestion)
+                        if real_distance <= self.edit_distance_max:
+                            results.update([suggestion])
+        return results
+
+
+
 
 
 class MongoDictionary(Dictionary):
