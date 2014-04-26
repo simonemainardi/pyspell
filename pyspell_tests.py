@@ -2,10 +2,31 @@ __author__ = 'Simone Mainardi, simonemainardi@startmail.com'
 
 import unittest
 from pprint import pprint
-from pyspell import Dictionary, DictionaryItems, Word
+from pyspell import OriginalTerms, SuggestTerms, Dictionary, Word
 
 
-class DictionaryItemsTests(unittest.TestCase):
+class TermsTests(unittest.TestCase):
+    def setUp(self):
+        self.oi = OriginalTerms()
+        self.st = SuggestTerms()
+
+    def test_original_terms(self):
+        self.oi['foo'] = 1
+        self.assertEqual(self.oi['foo'], 1)
+        self.oi['foo'] = 2
+        self.assertEqual(self.oi['foo'], 3)
+        self.assertEqual(self.oi['bar'], 0)
+
+    def test_suggest_terms(self):
+        self.st['python'] = 'pythonistas'
+        self.assertEqual(self.st['python'], 'pythonistas')
+        self.st['python'] = 'pythons'
+        self.assertEqual(self.st['python'], 'pythons')
+        self.st['python'] = 'pythones'
+        self.assertEqual(self.st['python'], 'pythons')
+
+
+class DictionaryItemsTests():
     def setUp(self):
         self.di = DictionaryItems()
 
@@ -45,27 +66,27 @@ class DictionaryTests(unittest.TestCase):
         self.d.add_word('ciao')
         ciao_deletes = Word.deletes('ciao', self.d.edit_distance_max)
         for delete in ciao_deletes:
-            self.assertIn(delete, self.d.items.items)
-            self.assertListEqual(['ciao'], self.d.items.items[delete]['suggestions'].keys())
+            self.assertIn(delete, self.d._suggestions.terms)
+            self.assertEqual('ciao', self.d._suggestions[delete])
 
         self.d.add_word('ciaoB')
         ciaoB_deletes = Word.deletes('ciaoB', self.d.edit_distance_max)
         for delete in ciaoB_deletes:
-            self.assertIn(delete, self.d.items.items)
+            self.assertIn(delete, self.d._suggestions.terms)
             try:
-                self.assertListEqual(['ciaoB'], self.d.items.items[delete]['suggestions'].keys())
+                self.assertEqual('ciaoB', self.d._suggestions[delete])
             except AssertionError:
                 # collisions with deletes of ciao -- ciao is preserved in the suggestions since its shorter
-                self.assertListEqual(['ciao'], self.d.items.items[delete]['suggestions'].keys())
+                self.assertEqual('ciao', self.d._suggestions[delete])
 
         for delete in ciao_deletes.intersection(ciaoB_deletes):
-            self.assertListEqual(self.d.items.items[delete]['suggestions'].keys(), ['ciao'])
+            self.assertEqual('ciao', self.d._suggestions[delete])
 
         for delete in ciao_deletes.difference(ciaoB_deletes):
-            self.assertListEqual(self.d.items.items[delete]['suggestions'].keys(), ['ciao'])
+            self.assertEqual('ciao', self.d._suggestions[delete])
 
         for delete in ciaoB_deletes.difference(ciao_deletes):
-            self.assertListEqual(self.d.items.items[delete]['suggestions'].keys(), ['ciaoB'])
+            self.assertEqual('ciaoB', self.d._suggestions[delete])
 
     def test_lookup(self):
         # typos have been made on purpose :)
@@ -78,9 +99,15 @@ class DictionaryTests(unittest.TestCase):
             self.d.add_words(bag)
             res = set()
             for word in bag:
-                res.update([word])
                 res.update(self.d.lookup(word))
             self.assertSetEqual(res, bag)
+
+    def test_lookup_2(self):
+        self.d.add_word('simone')
+        self.assertSetEqual(set(['simone']), self.d.lookup('simo'))
+        self.d.add_word('simon')  # a closer word arrives
+        self.assertSetEqual(set(['simon']), self.d.lookup('simo'))
+        self.assertSetEqual(set(['simon', 'simone']), self.d.lookup('simone'))
 
 if __name__ == '__main__':
     unittest.main()
