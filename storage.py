@@ -51,6 +51,8 @@ class RedisStorage(Storage):
     def __contains__(self, key):
         return True if self._r.get(key) else False
 
+    def keys(self):
+        return self._r.keys()
 
 class DictStorage(Storage):
     def __init__(self):
@@ -64,3 +66,6 @@ class DictStorage(Storage):
 
     def __contains__(self, key):
         return key in self._items
+
+    def keys(self):
+        return self._items.keys()

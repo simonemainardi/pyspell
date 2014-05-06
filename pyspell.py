@@ -2,25 +2,46 @@ __author__ = 'Simone Mainardi, simonemainardi@startmail.com'
 
 import codecs
 from word import Word
+from storage import DictStorage, RedisStorage
+
+
+def prepender(func):
+    """
+    Prepends some text to the *second* argument with which function has been called.
+    The *first* argument is a reference (`self`) to an instance of class Terms or one of its sub classes.
+    `self` is accessed to look for a prefix `_prefix` to append to the second argument.
+
+    This function is meant to be used as decorator.
+    """
+    def prepend(self, *args):
+        prepended = self._prefix + args[0]
+        return func(self, prepended, *args[1:])
+    return prepend
 
 
 class Terms(object):
-    def __init__(self):
-        self._items = {}
+    def __init__(self, storage=None, **kwargs):
+        if not storage:
+            self._items = DictStorage()
+        else:
+            self._items = RedisStorage(**kwargs)
 
     @property
     def terms(self):
-        return self._items.keys()
+        return [k[len(self._prefix):] for k in self._items.keys() if k.startswith(self._prefix)]
 
 
 class OriginalTerms(Terms):
+    _prefix = 't:'  # this prefix stands for `term:`
+
+    @prepender
     def __setitem__(self, word, count):
         """
         Adds the `word` to the original terms. The number of occurrences is specified in `count`.
         """
-        self._items.setdefault(word, 0)
-        self._items[word] += count
+        self._items.incrby(word, count)
 
+    @prepender
     def __getitem__(self, word):
         """
         Returns the number of occurrences of `word` in the corpus or 0 if it wasn't present.
@@ -29,6 +50,9 @@ class OriginalTerms(Terms):
 
 
 class SuggestTerms(Terms):
+    _prefix = 's:'  # this prefix stands for `suggestion:`
+
+    @prepender
     def __setitem__(self, delete, suggestion):
         """
         Adds the `delete` term with the corresponding `suggestion`.
@@ -44,6 +68,7 @@ class SuggestTerms(Terms):
             # if we simplify on len(delete) on both sides, we obtain the second condition in the above if statement.
             self._items[delete] = suggestion
 
+    @prepender
     def __getitem__(self, word):
         return self._items[word] if word in self._items else None
 
