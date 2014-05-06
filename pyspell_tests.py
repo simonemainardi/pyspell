@@ -26,35 +26,6 @@ class TermsTests(unittest.TestCase):
         self.assertEqual(self.st['python'], 'pythons')
 
 
-class DictionaryItemsTests():
-    def setUp(self):
-        self.di = DictionaryItems()
-
-    def test_set_item(self):
-        self.di['cia'] = ''  # an empty `term` for delete-edited words such as `cia` for and `ciao`
-        self.assertIn('cia', self.di.items)
-        self.assertEqual(self.di.items['cia']['term'], '')
-        self.assertListEqual(self.di.items['cia'].keys(), ['term'])
-
-        self.di['cia'] = 'cia'  # now assume that `cia` is also a word in the dictionary and not only a delete
-        self.assertIn('cia', self.di.items)
-        self.assertEqual(self.di.items['cia']['term'], 'cia')
-        self.assertSetEqual(set(self.di.items['cia'].keys()), set(['term', 'count']))
-
-        self.di['cia'] = 'cia'  # one more occurrence of 'cia' in the corpus...
-        self.assertEqual(self.di.items['cia']['count'], 2)
-
-    def test_add_suggestions(self):
-        self.di.add_suggestion('ciao', 'ciaoA', 1)
-        self.assertEqual(self.di.items['ciao']['term'], '')
-        self.assertEqual(self.di.items['ciao']['suggestions']['ciaoA'], 1)
-
-        self.di.add_suggestion('ciao', 'ciaoB', 1)
-        self.assertEqual(self.di.items['ciao']['term'], '')
-        # ciaoB is not inserted as a suggestion since there is already ciaoA which has the same distance from ciao
-        self.assertSetEqual(set(self.di.items['ciao']['suggestions'].keys()), set(['ciaoA']))
-
-
 class DictionaryTests(unittest.TestCase):
     def setUp(self):
         self.d = Dictionary()
