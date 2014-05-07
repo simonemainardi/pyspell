@@ -1,14 +1,23 @@
 __author__ = 'Simone Mainardi, simonemainardi@startmail.com'
 
 import unittest
-from pprint import pprint
+from storage import storage
 from pyspell import OriginalTerms, SuggestTerms, Dictionary, Word
+
+redis_host = 'localhost'
+redis_port = 6379
+redis_db = 5
+
+
+def redis_storage():
+    return storage('redis', flush_db=True, host=redis_host, port=redis_port, db=redis_db)
 
 
 class TermsTests(unittest.TestCase):
     def setUp(self):
-        self.oi = OriginalTerms()
-        self.st = SuggestTerms()
+        store = storage(None)  # None means built-in dictionary storage
+        self.oi = OriginalTerms(store)
+        self.st = SuggestTerms(store)
 
     def test_original_terms(self):
         self.oi['foo'] = 1
@@ -26,12 +35,27 @@ class TermsTests(unittest.TestCase):
         self.assertEqual(self.st['python'], 'pythons')
 
 
+class TestTermsRedis(TermsTests):
+    def setUp(self):
+        store = storage('redis', flush_db=True, host=redis_host, port=redis_port, db=redis_db)
+        self.oi = OriginalTerms(store)
+        self.st = SuggestTerms(store)
+
+    def tearDown(self):
+        storage('redis', flush_db=True, host=redis_host, port=redis_port, db=redis_db)
+
+
 class DictionaryTests(unittest.TestCase):
     def setUp(self):
         self.d = Dictionary()
-        self.words = ['orange', 'prange', 'rng']
-        self.words += ['banan', 'banana', 'banans']
-        self.words += ['aaple', 'apple', 'aple', 'aXpple', 'aXppYle']
+        self.words = DictionaryTests.some_words()
+
+    @staticmethod
+    def some_words():
+        words = ['orange', 'prange', 'rng']
+        words += ['banan', 'banana', 'banans']
+        words += ['aaple', 'apple', 'aple', 'aXpple', 'aXppYle']
+        return words
 
     def test_add_word(self):
         self.d.add_word('ciao')
@@ -79,6 +103,17 @@ class DictionaryTests(unittest.TestCase):
         self.d.add_word('simon')  # a closer word arrives
         self.assertSetEqual(set(['simon']), self.d.lookup('simo'))
         self.assertSetEqual(set(['simon', 'simone']), self.d.lookup('simone'))
+
+
+class DictionaryTestsRedis(DictionaryTests):
+    def setUp(self):
+        self.d = Dictionary(storage_type='redis', flush_db=True, host=redis_host, port=redis_port, db=redis_db)
+        self.words = DictionaryTests.some_words()
+
+    def tearDown(self):
+        # flush the database via storage
+        storage('redis', flush_db=True, host=redis_host, port=redis_port, db=redis_db)
+
 
 if __name__ == '__main__':
     unittest.main()

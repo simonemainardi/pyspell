@@ -2,12 +2,12 @@ __author__ = 'Simone Mainardi, simonemainardi@startmail.com'
 
 import codecs
 from word import Word
-from storage import DictStorage, RedisStorage
+from storage import storage
 
 
 def prepender(func):
     """
-    Prepends some text to the *second* argument with which function has been called.
+    Prepends some text to the *second* argument with which function `func` has been called.
     The *first* argument is a reference (`self`) to an instance of class Terms or one of its sub classes.
     `self` is accessed to look for a prefix `_prefix` to append to the second argument.
 
@@ -20,14 +20,14 @@ def prepender(func):
 
 
 class Terms(object):
-    def __init__(self, storage=None, **kwargs):
-        if not storage:
-            self._items = DictStorage()
-        else:
-            self._items = RedisStorage(**kwargs)
+    def __init__(self, store=None):
+        self._items = store
 
     @property
     def terms(self):
+        """
+        Returns all the terms we have stored without their prefix
+        """
         return [k[len(self._prefix):] for k in self._items.keys() if k.startswith(self._prefix)]
 
 
@@ -74,9 +74,10 @@ class SuggestTerms(Terms):
 
 
 class Dictionary(object):
-    def __init__(self, edit_distance_max=2):
-        self._terms = OriginalTerms()
-        self._suggestions = SuggestTerms()
+    def __init__(self, edit_distance_max=2, storage_type=None, **kwargs):
+        store = storage(storage_type, **kwargs)
+        self._terms = OriginalTerms(store)
+        self._suggestions = SuggestTerms(store)
         self.edit_distance_max = edit_distance_max
 
     def add_word(self, word):

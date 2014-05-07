@@ -3,6 +3,17 @@ __author__ = 'Simone Mainardi, simonemainardi@startmail.com'
 import abc
 import redis
 
+__all__ = ['storage']
+
+
+def storage(storage_type, **kwargs):
+    if not storage_type:
+        return DictStorage()
+    elif storage_type == 'redis':
+        return RedisStorage(**kwargs)
+    else:
+        raise ValueError('storage_type not supported.')
+
 
 class Storage(object):
     @abc.abstractmethod
@@ -29,7 +40,7 @@ class Storage(object):
         return
 
     def incrby(self, key, incr):
-        if not self[key]:
+        if key not in self:
             self[key] = 0
         self[key] = int(self[key]) + incr
         return int(self[key])
@@ -43,7 +54,12 @@ class RedisStorage(Storage):
         self._r = r
 
     def __getitem__(self, key):
-        return self._r.get(key)
+        val = self._r.get(key)
+        try:
+            return int(val)
+        except ValueError:
+            return val
+
 
     def __setitem__(self, key, value):
         self._r.set(key, value)
