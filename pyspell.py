@@ -74,11 +74,12 @@ class SuggestTerms(Terms):
 
 
 class Dictionary(object):
-    def __init__(self, edit_distance_max=2, storage_type=None, **kwargs):
+    def __init__(self, edit_distance_max=2, best_suggestion_only=False, storage_type=None, **kwargs):
         store = storage(storage_type, **kwargs)
         self._terms = OriginalTerms(store)
         self._suggestions = SuggestTerms(store)
         self.edit_distance_max = edit_distance_max
+        self.best_suggestion_only = best_suggestion_only
 
     def add_word(self, word):
         self._terms[word] = 1
@@ -89,16 +90,18 @@ class Dictionary(object):
         for word in words:
             self.add_word(word)
 
-    def initialize(self, dictionary_file):
-        """ Initializes the dictionary using the `dictionary_file` provided, which is
-        simply a word list, one word per line.
+    def initialize(self, text):
+        """ Initializes the dictionary using the `text` provided.
         """
-        with codecs.open(dictionary_file, encoding='utf-8') as f:
+        with codecs.open(text, encoding='utf-8') as f:
             for line in f:
                 word = line.strip()
                 self.add_word(word)
 
     def lookup(self, word):
+        if self._terms[word] > 0 and self.best_suggestion_only:  # there is an exact match in the dictionary
+            return set([word])
+
         results = set()
         candidates = set([(word, 0)])  # a set of tuples (candidate, candidate_distance)
         for delete in Word.deletes(word, self.edit_distance_max):
@@ -111,9 +114,9 @@ class Dictionary(object):
             candidate_count = self._terms[candidate]  # the (possibly 0) no. of occurrences for candidate
             if candidate_count > 0:  # there is an entry for this item in the dictionary
                 #  candidate is an original word!
-                results.update([candidate])
+                results.update([(candidate, candidate_distance)])
             suggestion = self._suggestions[candidate]  # the (possibly not existing) suggestion for candidate
-            if suggestion and not suggestion in results:  # if the suggestion exists and has not yet been found
+            if suggestion and not suggestion in [r[0] for r in results]:  # the suggestion exists and hasn't been found
                 if suggestion == word:  # by chance, the suggestion is actually the word we are looking for
                     real_distance = 0
                 elif candidate_distance == 0:  # candidate _is_ the word we are looking up for
@@ -121,8 +124,13 @@ class Dictionary(object):
                 else:  # candidate is a delete edit of the word we are looking up for
                     real_distance = Word.damerau_levenshtein_distance(candidate, suggestion)
                 if real_distance <= self.edit_distance_max:
-                    results.update([suggestion])
-        return results
+                    results.update([(suggestion, real_distance)])
+        # sort the results first by increasing distance, then by decreasing frequency
+        print "BEFORE=", results
+        results = sorted(list(results), key=lambda r: (r[1], -self._terms[r[0]]))
+        results = [r[0] for r in results]  # take out the distances and keep only the suggestions
+        print "AFTER=", results
+        return set(results)
 
 
 if __name__ == '__main__':
