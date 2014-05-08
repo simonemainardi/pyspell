@@ -24,6 +24,13 @@ class StorageTests(unittest.TestCase):
         self.storage['ciao'] = 'hullo'
         self.assertEqual('hullo', self.storage['ciao'])
 
+    def test_set_features(self):
+        fruits = set(['apple', 'banana', 'kiwi', 1, 2, 3])
+        for fruit in fruits:
+            self.storage.sadd('fruit', fruit)
+        self.assertSetEqual(fruits, self.storage.smembers('fruit'))
+        self.storage.sclear('fruit')
+        self.assertSetEqual(set(), self.storage.smembers('fruit'))
 
 class RedisStorageTests(StorageTests):
     def setUp(self):

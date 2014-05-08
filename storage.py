@@ -60,12 +60,30 @@ class RedisStorage(Storage):
         except ValueError:
             return val
 
-
     def __setitem__(self, key, value):
         self._r.set(key, value)
 
     def __contains__(self, key):
         return True if self._r.get(key) else False
+
+    def smembers(self, key):
+        """
+        Get all the members in a set.
+        """
+        res = self._r.smembers(key)
+        return set([int(el) if el.isdigit() else el for el in res])  # possibly convert values to integers
+
+    def sadd(self, key, value):
+        """
+        Insert a `value` into a set.
+        """
+        self._r.sadd(key, value)
+
+    def sclear(self, key):
+        """
+        Clear the contents of a set
+        """
+        self._r.delete(key)
 
     def keys(self):
         return self._r.keys()
@@ -82,6 +100,27 @@ class DictStorage(Storage):
 
     def __contains__(self, key):
         return key in self._items
+
+    def smembers(self, key):
+        """
+        Get all the members in a set.
+        """
+        return self.__getitem__(key)
+
+    def sadd(self, key, value):
+        """
+        Insert a `value` into a set.
+        """
+        if not key in self._items:
+            self._items[key] = set([value])
+        else:
+            self._items[key].update([value])
+
+    def sclear(self, key):
+        """
+        Clear the contents of a set
+        """
+        self._items[key].clear()
 
     def keys(self):
         return self._items.keys()
