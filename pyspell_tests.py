@@ -85,24 +85,24 @@ class DictionaryTests(unittest.TestCase):
 
     def test_lookup(self):
         # typos have been made on purpose :)
-        bags = [set(['apl', 'aple', 'apple', 'applex', 'applexy']),
-                set(['orange', 'rnge', 'rn']),
-                set(['kiwi', 'kiwi;;', 'ki']),
-                set(['watermelon', 'wassermelon', 'waxermekon'])]
+        bags = [['apl', 'aple', 'apple', 'applex', 'applexy'],
+                ['orange', 'rnge', 'rn'],
+                ['kiwi', 'kiwi;;', 'ki'],
+                ['watermelon', 'wassermelon', 'waxermekon']]
 
         for bag in bags:
             self.d.add_words(bag)
-            res = set()
+            res = []
             for word in bag:
-                res.update(self.d.lookup(word))
-            self.assertSetEqual(res, bag)
+                res += self.d.lookup(word)
+            self.assertListEqual(sorted(list(set(res))), sorted(bag))
 
     def test_lookup_2(self):
         self.d.add_word('simone')
-        self.assertSetEqual(set(['simone']), self.d.lookup('simo'))
+        self.assertListEqual(['simone'], self.d.lookup('simo'))
         self.d.add_word('simon')  # a closer word arrives
-        self.assertSetEqual(set(['simon']), self.d.lookup('simo'))
-        self.assertSetEqual(set(['simon', 'simone']), self.d.lookup('simone'))
+        self.assertListEqual(['simon'], self.d.lookup('simo'))
+        self.assertListEqual(['simone', 'simon'], self.d.lookup('simone'))
 
 
 class DictionaryTestsRedis(DictionaryTests):

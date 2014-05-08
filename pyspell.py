@@ -98,16 +98,18 @@ class Dictionary(object):
                 word = line.strip()
                 self.add_word(word)
 
-    def lookup(self, word):
+    def lookup(self, word, return_distances=False):
         if self._terms[word] > 0 and self.best_suggestion_only:  # there is an exact match in the dictionary
-            return set([word])
+            return [word]
 
         results = set()
         candidates = set([(word, 0)])  # a set of tuples (candidate, candidate_distance)
         for delete in Word.deletes(word, self.edit_distance_max):
             delete_distance = len(word) - len(delete)
             candidates.update([(delete, delete_distance)])
-        candidates = sorted(candidates, key=lambda (x): -x[1])  # sort according to an increasing distance
+        candidates = sorted(candidates, key=lambda x: x[1])  # sort by increasing distance
+
+        print "candidates=", candidates
 
         while candidates:
             candidate, candidate_distance = candidates.pop()  # the distance of the candidate from `word`
@@ -115,6 +117,7 @@ class Dictionary(object):
             if candidate_count > 0:  # there is an entry for this item in the dictionary
                 #  candidate is an original word!
                 results.update([(candidate, candidate_distance)])
+                print "candidate count > 0: results=", results
             suggestion = self._suggestions[candidate]  # the (possibly not existing) suggestion for candidate
             if suggestion and not suggestion in [r[0] for r in results]:  # the suggestion exists and hasn't been found
                 if suggestion == word:  # by chance, the suggestion is actually the word we are looking for
@@ -122,15 +125,17 @@ class Dictionary(object):
                 elif candidate_distance == 0:  # candidate _is_ the word we are looking up for
                     real_distance = len(suggestion) - len(candidate)  # suggestion_distance
                 else:  # candidate is a delete edit of the word we are looking up for
-                    real_distance = Word.damerau_levenshtein_distance(candidate, suggestion)
+                    real_distance = Word.damerau_levenshtein_distance(word, suggestion)
                 if real_distance <= self.edit_distance_max:
                     results.update([(suggestion, real_distance)])
+                print "suggestion found for candidate %s : results=%s" % (candidate, results)
         # sort the results first by increasing distance, then by decreasing frequency
         print "BEFORE=", results
         results = sorted(list(results), key=lambda r: (r[1], -self._terms[r[0]]))
-        results = [r[0] for r in results]  # take out the distances and keep only the suggestions
+        if not return_distances:
+            results = [r[0] for r in results]  # pop out the distances and keep only the suggestions
         print "AFTER=", results
-        return set(results)
+        return results
 
 
 if __name__ == '__main__':
