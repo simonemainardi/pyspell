@@ -105,7 +105,7 @@ class DictStorage(Storage):
         """
         Get all the members in a set.
         """
-        return self.__getitem__(key)
+        return self._items[key] if key in self._items else set()
 
     def sadd(self, key, value):
         """

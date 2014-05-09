@@ -28,11 +28,14 @@ class TermsTests(unittest.TestCase):
 
     def test_suggest_terms(self):
         self.st['python'] = 'pythonistas'
-        self.assertEqual(self.st['python'], 'pythonistas')
-        self.st['python'] = 'pythons'
-        self.assertEqual(self.st['python'], 'pythons')
-        self.st['python'] = 'pythones'
-        self.assertEqual(self.st['python'], 'pythons')
+        self.assertSetEqual(self.st['python'], set(['pythonistas']))
+        self.st['python'] = 'pythons'  # this substitutes 'pythonistas' since it's closer to 'python'
+        self.assertSetEqual(self.st['python'], set(['pythons']))
+        self.st['python'] = 'pythones'  # 'pythons' is closer than 'pythones' so no substitution should occour
+        self.assertSetEqual(self.st['python'], set(['pythons']))
+        self.st['python'] = 'python1'  # these are appends since have the same distance as 'pythons'
+        self.st['python'] = 'python2'
+        self.assertSetEqual(self.st['python'], set(['pythons', 'python1', 'python2']))
 
 
 class TestTermsRedis(TermsTests):
@@ -62,26 +65,36 @@ class DictionaryTests(unittest.TestCase):
         ciao_deletes = Word.deletes('ciao', self.d.edit_distance_max)
         for delete in ciao_deletes:
             self.assertIn(delete, self.d._suggestions.terms)
-            self.assertEqual('ciao', self.d._suggestions[delete])
+            self.assertSetEqual(set(['ciao']), self.d._suggestions[delete])
 
         self.d.add_word('ciaoB')
         ciaoB_deletes = Word.deletes('ciaoB', self.d.edit_distance_max)
         for delete in ciaoB_deletes:
             self.assertIn(delete, self.d._suggestions.terms)
             try:
-                self.assertEqual('ciaoB', self.d._suggestions[delete])
+                self.assertSetEqual(set(['ciaoB']), self.d._suggestions[delete])
             except AssertionError:
                 # collisions with deletes of ciao -- ciao is preserved in the suggestions since its shorter
-                self.assertEqual('ciao', self.d._suggestions[delete])
+                self.assertSetEqual(set(['ciao']), self.d._suggestions[delete])
 
         for delete in ciao_deletes.intersection(ciaoB_deletes):
-            self.assertEqual('ciao', self.d._suggestions[delete])
+            self.assertSetEqual(set(['ciao']), self.d._suggestions[delete])
 
         for delete in ciao_deletes.difference(ciaoB_deletes):
-            self.assertEqual('ciao', self.d._suggestions[delete])
+            self.assertSetEqual(set(['ciao']), self.d._suggestions[delete])
 
         for delete in ciaoB_deletes.difference(ciao_deletes):
-            self.assertEqual('ciaoB', self.d._suggestions[delete])
+            self.assertSetEqual(set(['ciaoB']), self.d._suggestions[delete])
+
+        self.d.add_word('miao')
+        miao_deletes = Word.deletes('miao', self.d.edit_distance_max)
+        for delete in miao_deletes:
+            self.assertIn(delete, self.d._suggestions.terms)
+        for delete in miao_deletes.intersection(ciao_deletes):  # deletes in common have two elements now
+            self.assertSetEqual(set(['ciao', 'miao']), self.d._suggestions[delete])
+        for delete in miao_deletes.difference(ciao_deletes):  # these are only 'miao' deletes
+            self.assertSetEqual(set(['miao']), self.d._suggestions[delete])
+
 
     def test_lookup(self):
         # typos have been made on purpose :)

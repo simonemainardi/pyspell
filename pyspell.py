@@ -59,18 +59,21 @@ class SuggestTerms(Terms):
         """
         # Damerau-Levenshtein distance can be trivially inferred since `delete` is obtained
         # by deleting one or more characters from suggestion.
-        if delete not in self._items or len(suggestion) < len(self._items[delete]):
-            # if delete is not present in the delete terms OR
+        suggestions = self._items.smembers(delete)  # get currently existing suggestions
+        smallest_suggestion_len = len(min(suggestions, key=len)) if suggestions else len(suggestion)
+        if len(suggestion) < smallest_suggestion_len:
             # if the new suggestion` has a smaller Damerau-Levenshtein distance from `delete`
-            # we create/modify the entry.
+            # we clear the already existing suggestions
             # The new `suggestion` has a smaller Damerau-Levenshtein distance if:
-            # len(suggestion) - len(delete) < len(self._items[delete]) - len(delete)
+            # len(suggestion) - len(delete) < len(min(suggestions, key=len)) - len(delete)
             # if we simplify on len(delete) on both sides, we obtain the second condition in the above if statement.
-            self._items[delete] = suggestion
+            self._items.sclear(delete)
+        if len(suggestion) <= smallest_suggestion_len:
+            self._items.sadd(delete, suggestion)
 
     @prepender
     def __getitem__(self, word):
-        return self._items[word] if word in self._items else None
+        return self._items.smembers(word)
 
 
 class Dictionary(object):
@@ -118,17 +121,18 @@ class Dictionary(object):
                 #  candidate is an original word!
                 results.update([(candidate, candidate_distance)])
                 print "candidate count > 0: results=", results
-            suggestion = self._suggestions[candidate]  # the (possibly not existing) suggestion for candidate
-            if suggestion and not suggestion in [r[0] for r in results]:  # the suggestion exists and hasn't been found
-                if suggestion == word:  # by chance, the suggestion is actually the word we are looking for
-                    real_distance = 0
-                elif candidate_distance == 0:  # candidate _is_ the word we are looking up for
-                    real_distance = len(suggestion) - len(candidate)  # suggestion_distance
-                else:  # candidate is a delete edit of the word we are looking up for
-                    real_distance = Word.damerau_levenshtein_distance(word, suggestion)
-                if real_distance <= self.edit_distance_max:
-                    results.update([(suggestion, real_distance)])
-                print "suggestion found for candidate %s : results=%s" % (candidate, results)
+            suggestions = self._suggestions[candidate]  # the (possibly not existing) suggestions for candidate
+            for suggestion in suggestions:
+                if not suggestion in [r[0] for r in results]:  # the sugg. exists and hasn't been found yet
+                    if suggestion == word:  # suggestion _is_ the word we are looking for
+                        real_distance = 0
+                    elif candidate_distance == 0:  # candidate _is_ the word we are looking up for
+                        real_distance = len(suggestion) - len(candidate)  # suggestion_distance
+                    else:  # candidate is a delete edit of the word we are looking up for
+                        real_distance = Word.damerau_levenshtein_distance(word, suggestion)
+                    if real_distance <= self.edit_distance_max:
+                        results.update([(suggestion, real_distance)])
+                    print "suggestion found for candidate %s : results=%s" % (candidate, results)
         # sort the results first by increasing distance, then by decreasing frequency
         print "BEFORE=", results
         results = sorted(list(results), key=lambda r: (r[1], -self._terms[r[0]]))
