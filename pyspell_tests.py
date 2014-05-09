@@ -51,6 +51,7 @@ class TestTermsRedis(TermsTests):
 class DictionaryTests(unittest.TestCase):
     def setUp(self):
         self.d = Dictionary()
+        self.d_all = Dictionary(best_suggestions_only=False)
         self.words = DictionaryTests.some_words()
 
     @staticmethod

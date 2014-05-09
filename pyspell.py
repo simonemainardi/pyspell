@@ -52,6 +52,10 @@ class OriginalTerms(Terms):
 class SuggestTerms(Terms):
     _prefix = 's:'  # this prefix stands for `suggestion:`
 
+    def __init__(self, store, best_suggestions_only=True):
+        self._best_suggestions_only = best_suggestions_only
+        super(SuggestTerms, self).__init__(store)
+
     @prepender
     def __setitem__(self, delete, suggestion):
         """
@@ -61,14 +65,14 @@ class SuggestTerms(Terms):
         # by deleting one or more characters from suggestion.
         suggestions = self._items.smembers(delete)  # get currently existing suggestions
         smallest_suggestion_len = len(min(suggestions, key=len)) if suggestions else len(suggestion)
-        if len(suggestion) < smallest_suggestion_len:
+        if len(suggestion) < smallest_suggestion_len and self._best_suggestions_only:
             # if the new suggestion` has a smaller Damerau-Levenshtein distance from `delete`
             # we clear the already existing suggestions
             # The new `suggestion` has a smaller Damerau-Levenshtein distance if:
             # len(suggestion) - len(delete) < len(min(suggestions, key=len)) - len(delete)
             # if we simplify on len(delete) on both sides, we obtain the second condition in the above if statement.
             self._items.sclear(delete)
-        if len(suggestion) <= smallest_suggestion_len:
+        if not self._best_suggestions_only or len(suggestion) <= smallest_suggestion_len:
             self._items.sadd(delete, suggestion)
 
     @prepender
@@ -77,12 +81,12 @@ class SuggestTerms(Terms):
 
 
 class Dictionary(object):
-    def __init__(self, edit_distance_max=2, best_suggestion_only=False, storage_type=None, **kwargs):
+    def __init__(self, edit_distance_max=2, best_suggestions_only=True, storage_type=None, **kwargs):
         store = storage(storage_type, **kwargs)
         self._terms = OriginalTerms(store)
-        self._suggestions = SuggestTerms(store)
+        self._suggestions = SuggestTerms(store, best_suggestions_only)
         self.edit_distance_max = edit_distance_max
-        self.best_suggestion_only = best_suggestion_only
+        self.best_suggestions_only = best_suggestions_only
 
     def add_word(self, word):
         self._terms[word] = 1
@@ -102,9 +106,6 @@ class Dictionary(object):
                 self.add_word(word)
 
     def lookup(self, word, return_distances=False):
-        if self._terms[word] > 0 and self.best_suggestion_only:  # there is an exact match in the dictionary
-            return [word]
-
         results = set()
         candidates = set([(word, 0)])  # a set of tuples (candidate, candidate_distance)
         for delete in Word.deletes(word, self.edit_distance_max):
