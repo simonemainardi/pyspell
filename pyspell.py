@@ -112,16 +112,12 @@ class Dictionary(object):
             delete_distance = len(word) - len(delete)
             candidates.update([(delete, delete_distance)])
         candidates = sorted(candidates, key=lambda x: x[1])  # sort by increasing distance
-
-        print "candidates=", candidates
-
         while candidates:
             candidate, candidate_distance = candidates.pop()  # the distance of the candidate from `word`
             candidate_count = self._terms[candidate]  # the (possibly 0) no. of occurrences for candidate
             if candidate_count > 0:  # there is an entry for this item in the dictionary
                 #  candidate is an original word!
                 results.update([(candidate, candidate_distance)])
-                print "candidate count > 0: results=", results
             suggestions = self._suggestions[candidate]  # the (possibly not existing) suggestions for candidate
             for suggestion in suggestions:
                 if not suggestion in [r[0] for r in results]:  # the sugg. exists and hasn't been found yet
@@ -133,20 +129,15 @@ class Dictionary(object):
                         real_distance = Word.damerau_levenshtein_distance(word, suggestion)
                     if real_distance <= self.edit_distance_max:
                         results.update([(suggestion, real_distance)])
-                    print "suggestion found for candidate %s : results=%s" % (candidate, results)
         # sort the results first by increasing distance, then by decreasing frequency
-        print "BEFORE=", results
         results = sorted(list(results), key=lambda r: (r[1], -self._terms[r[0]]))
         if self.best_suggestions_only and len(results) > 1:
             # only take the original word (if present) and the suggestions with minimum distance from `word`
             min_index = 0 if results[0][1] != 0 else 1  # possibly exclude `word` from the minimum distance
             best_dist = min(results[min_index:], key=lambda r: r[1])[1]  # results[0] may be the original word
-            print "best_dist=", best_dist
             results = [r for r in results if r[1] <= best_dist]
-            print "results_pruned=", results
         if not return_distances:
             results = [r[0] for r in results]  # pop out the distances and keep only the suggestions
-        print "AFTER=", results
         return results
 
 
