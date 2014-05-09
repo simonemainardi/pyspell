@@ -139,7 +139,7 @@ class Dictionary(object):
         results = sorted(list(results), key=lambda r: (r[1], -self._terms[r[0]]))
         if self.best_suggestions_only and len(results) > 1:
             # only take the original word (if present) and the suggestions with minimum distance from `word`
-            min_index = 0 if results[0][0] != 0 else 1  # possibly exclude `word` from the minimum distance
+            min_index = 0 if results[0][1] != 0 else 1  # possibly exclude `word` from the minimum distance
             best_dist = min(results[min_index:], key=lambda r: r[1])[1]  # results[0] may be the original word
             print "best_dist=", best_dist
             results = [r for r in results if r[1] <= best_dist]
