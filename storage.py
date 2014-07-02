@@ -25,6 +25,13 @@ class Storage(object):
         return
 
     @abc.abstractmethod
+    def __del__(self):
+        """
+        Deletes in-memory data structures
+        """
+        return
+
+    @abc.abstractmethod
     def __getitem__(self, item):
         """
         Looks for the `item` and possibly returns its value. None is returned if `item` is not present.
@@ -52,6 +59,9 @@ class RedisStorage(Storage):
         if flush_db:
             r.flushdb()
         self._r = r
+
+    def __del__(self):
+        del self._r
 
     def __getitem__(self, key):
         val = self._r.get(key)
@@ -88,9 +98,14 @@ class RedisStorage(Storage):
     def keys(self):
         return self._r.keys()
 
+
 class DictStorage(Storage):
     def __init__(self):
         self._items = dict()
+
+    def __del__(self):
+        self._items.clear()
+        del self._items
 
     def __getitem__(self, key):
         return self._items[key] if key in self._items else None
