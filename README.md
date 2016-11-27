@@ -12,7 +12,7 @@ Suppose we want to initialize our dictionary with a book. Let's download _Moby D
 >>> import urllib
 >>> import re, string
 >>> 
->>> book = urllib.urlopen('http://www.gutenberg.org/cache/epub/2701/pg2701.txt').read()
+>>> book = urllib.urlopen('https://www.gutenberg.org/files/2701/2701-0.txt').read()
 >>> pattern = re.compile('[\W_]+')  # alpha-num only
 >>> book = pattern.sub(' ', book).lower().split()  # lower case
 ```
@@ -21,4 +21,8 @@ Using the book as a dictionary for pyspell is as simple as:
 >>> from pyspell import Dictionary
 >>> d = Dictionary()
 >>> d.add_words(book)
+>>> d.lookup('moubtains')
+    ['mountains']
+>>> d.lookup('cricumstances')
+    ['circumstances']
 ```
